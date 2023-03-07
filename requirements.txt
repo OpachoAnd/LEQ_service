@@ -1,0 +1,2 @@
+SQLAlchemy~=1.4.39
+environs~=9.5.0
