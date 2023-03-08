@@ -33,7 +33,8 @@ class DBCommands:
         Создает таблицы в БД
         """
         Base.metadata.create_all(ENGINE)
-        
+
 
 if __name__ == '__main__':
+    # Создание текущих таблиц при начале работы с базой данных
     DBCommands.create_tables()

@@ -13,4 +13,6 @@ DB_ENGINE = env.str('DB_ENGINE')
 ENGINE = create_engine('{0}://{1}:{2}@{3}/{4}'.format(DB_ENGINE, DB_USER,
                                                       DB_PASSWORD, DB_HOST, DB_NAME), pool_pre_ping=True)
 
-ENGINE.connect()
+if __name__ == "__main__":
+    # Проверка на подключение к БД
+    ENGINE.connect()
