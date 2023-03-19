@@ -107,6 +107,7 @@ dependencies:
   - xz=5.2.5=h7b6447c_0
   - zlib=1.2.11=h7b6447c_3
   - zstd=1.4.9=haebb681_0
+  - git
   - pip:
     - absl-py==0.13.0
     - astor==0.8.1
@@ -146,3 +147,5 @@ dependencies:
     - wrapt==1.12.1
     - yacs==0.1.8
     - zipp==3.4.1
+    - SQLAlchemy~=1.4.39
+    - environs~=9.5.0
