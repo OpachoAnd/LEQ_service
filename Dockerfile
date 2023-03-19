@@ -8,20 +8,12 @@ FROM nvidia/cuda:11.2.0-devel-ubuntu18.04
 RUN apt-get update && apt-get install curl -y
 RUN apt-get update && apt-get install -y git
 
-RUN set -xe && apt-get -yqq update && apt-get -yqq install python3-pip && pip3 install --upgrade pip
 
 # install anaconda
 RUN cd /tmp && curl -O https://repo.anaconda.com/archive/Anaconda3-2022.05-Linux-x86_64.sh
 RUN chmod +x /tmp/Anaconda3-2022.05-Linux-x86_64.sh
 RUN mkdir /root/.conda
 RUN bash -c "/tmp/Anaconda3-2022.05-Linux-x86_64.sh -b -p /conda"
-
-
-
-#RUN cd /tmp && curl -O https://repo.anaconda.com/archive/Anaconda3-2020.11-Linux-x86_64.sh
-#RUN chmod +x /tmp/Anaconda3-2020.11-Linux-x86_64.sh
-#RUN mkdir /root/.conda
-#RUN bash -c "/tmp/Anaconda3-2020.11-Linux-x86_64.sh -b -p /conda"
 
 RUN /conda/bin/conda init bash
 
@@ -33,7 +25,7 @@ WORKDIR /usr/src/app
 #COPY ./environment.yml /usr/src/app
 
 COPY . /usr/src/app
-RUN /conda/bin/conda env create -f environment.yml 
+RUN /conda/bin/conda env create -f environmentTest.yml 
 #RUN /conda/bin/conda create --name adnerf2 -y
 
 
