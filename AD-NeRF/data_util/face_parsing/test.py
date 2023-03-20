@@ -1,6 +1,8 @@
 #!/usr/bin/python
 # -*- encoding: utf-8 -*-
 import numpy as np
+
+from handlers.preprocessing_video import ROOT_DIRECTORY
 from logger import setup_logger
 from model import BiSeNet
 
@@ -94,6 +96,6 @@ if __name__ == "__main__":
     parser.add_argument('--imgpath', type=str,
                         default='./imgs/', help='path for input images')
     parser.add_argument('--modelpath', type=str,
-                        default='data_util/face_parsing/79999_iter.pth')
+                        default=f'{ROOT_DIRECTORY}/AD-NeRF/data_util/face_parsing/79999_iter.pth')
     args = parser.parse_args()
     evaluate(respth=args.respath, dspth=args.imgpath, cp=args.modelpath)

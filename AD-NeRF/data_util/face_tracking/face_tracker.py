@@ -4,6 +4,7 @@ import torch
 import numpy as np
 from facemodel import Face_3DMM
 from data_loader import load_dir
+from handlers.preprocessing_video import ROOT_DIRECTORY
 from util import *
 from render_3dmm import Render_3DMM
 import os
@@ -37,7 +38,7 @@ args = parser.parse_args()
 start_id = 0
 end_id = args.frame_num
 
-id_dir = os.path.join('dataset', args.idname)
+id_dir = os.path.join(f'{ROOT_DIRECTORY}/cloud', args.idname)
 lms, img_paths = load_dir(os.path.join(id_dir, 'ori_imgs'), start_id, end_id)
 num_frames = lms.shape[0]
 h, w = args.img_h, args.img_w
