@@ -26,7 +26,7 @@ RUN conda update --all
 # import folders
 WORKDIR /usr/src/app
 COPY . /usr/src/app
-ENV PYTHONPATH "${PYTHONPATH}:/usr/src/app/LEQ_service"
+ENV PYTHONPATH /usr/src/app
 ENV CUDA_HOME "${CUDA_HOME}/usr/local/cuda-11.2"
 
 # install environment for AD-NeRF
@@ -36,6 +36,8 @@ RUN echo conda activate adnerf2 >> /root/.bashrc
 RUN /conda/bin/activate adnerf2 && conda install -c bottler nvidiacub
 #RUN /conda/bin/activate adnerf2 && cd pytorch3d && /conda/envs/adnerf2/bin/pip install -e .
 RUN /conda/bin/activate adnerf2 && cd AD-NeRF/data_util/face_tracking && /conda/envs/adnerf2/bin/python convert_BFM.py
-ENTRYPOINT ["/conda/envs/adnerf2/bin/pip", "install", "-e", "pytorch3d/."]
-
+#ENTRYPOINT ["/conda/envs/adnerf2/bin/pip", "install", "-e", "pytorch3d/." && "/conda/envs/adnerf2/bin/python", "handlers/preprocessing_video.py"]
+#CMD /conda/envs/adnerf2/bin/pip install -e pytorch3d/.; /conda/envs/adnerf2/bin/python handlers/preprocessing_video.py
+ENTRYPOINT ["/bin/bash", "-c", "/conda/bin/conda run --no-capture-output -n adnerf2 pip install -e pytorch3d/. && /conda/bin/conda run --no-capture-output -n adnerf2 python handlers/preprocessing_video.py"]
+#CMD ["/conda/envs/adnerf2/bin/python", "handlers/preprocessing_video.py"]
 
