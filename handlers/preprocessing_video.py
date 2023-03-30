@@ -1,42 +1,42 @@
-import cv2
-import numpy as np
-import face_alignment
-from skimage import io
-import torch
-import torch.nn.functional as F
 import json
 import os
-from sklearn.neighbors import NearestNeighbors
 from pathlib import Path
-import argparse
 
+import cv2
+import face_alignment
+import numpy as np
+import torch
+import torch.multiprocessing as mp
+from skimage import io
+from sklearn.neighbors import NearestNeighbors
 
-ROOT_DIRECTORY = str(Path(__file__).absolute().parent.parent)
+ROOT_DIRECTORY = str(Path(__file__).absolute().parent.parent) + '/'
 
 
 class Preprocessing(object):
     """docstring"""
+
     def __init__(self, id: str):
 
         self.id = id
 
         self.max_frame_num = 100000
-        self.vid_file = os.path.join('cloud', 'video', id+'.mp4')
+        self.vid_file = os.path.join('cloud', 'video', id + '.mp4')
 
         self.id_dir = os.path.join('cloud', id)
-        Path(ROOT_DIRECTORY + '/' + self.id_dir).mkdir(parents=True, exist_ok=True)
+        Path(ROOT_DIRECTORY + self.id_dir).mkdir(parents=True, exist_ok=True)
 
         self.ori_imgs_dir = os.path.join('cloud', id, 'ori_imgs')
-        Path(ROOT_DIRECTORY + '/' + self.ori_imgs_dir).mkdir(parents=True, exist_ok=True)
+        Path(ROOT_DIRECTORY + self.ori_imgs_dir).mkdir(parents=True, exist_ok=True)
 
         self.parsing_dir = os.path.join(self.id_dir, 'parsing')
-        Path(ROOT_DIRECTORY + '/' + self.parsing_dir).mkdir(parents=True, exist_ok=True)
+        Path(ROOT_DIRECTORY + self.parsing_dir).mkdir(parents=True, exist_ok=True)
 
         self.head_imgs_dir = os.path.join('cloud', id, 'head_imgs')
-        Path(ROOT_DIRECTORY + '/' + self.head_imgs_dir).mkdir(parents=True, exist_ok=True)
+        Path(ROOT_DIRECTORY + self.head_imgs_dir).mkdir(parents=True, exist_ok=True)
 
         self.com_imgs_dir = os.path.join('cloud', id, 'com_imgs')
-        Path(ROOT_DIRECTORY + '/' + self.com_imgs_dir).mkdir(parents=True, exist_ok=True)
+        Path(ROOT_DIRECTORY + self.com_imgs_dir).mkdir(parents=True, exist_ok=True)
 
         self.valid_img_num = None
         self.valid_img_ids = None
@@ -83,52 +83,52 @@ class Preprocessing(object):
     def step_0(self):
         print('--- Step0: extract deepspeech feature ---')
         wav_file = os.path.join(self.id_dir, 'aud.wav')
-        extract_wav_cmd = 'ffmpeg -i ' + ROOT_DIRECTORY + '/' + self.vid_file + ' -f wav -ar 16000 ' + ROOT_DIRECTORY + '/' + wav_file
+        extract_wav_cmd = 'ffmpeg -i ' + ROOT_DIRECTORY + self.vid_file + ' -f wav -ar 16000 ' + \
+                          ROOT_DIRECTORY + wav_file
         os.system(extract_wav_cmd)
         print(self.id_dir)
-        extract_ds_cmd = f'python {ROOT_DIRECTORY}/AD-NeRF/data_util/deepspeech_features/extract_ds_features.py --input=' + ROOT_DIRECTORY + '/' + self.id_dir
+        extract_ds_cmd = f'python {ROOT_DIRECTORY}ad_nerf/data_util/deepspeech_features/extract_ds_features.py ' \
+                         f'--input=' + ROOT_DIRECTORY + self.id_dir
         os.system(extract_ds_cmd)
-        #exit()
 
     def step_1(self):
         print('--- Step1: extract images from vids ---')
         print()
-        cap = cv2.VideoCapture(ROOT_DIRECTORY + '/' + self.vid_file)
+        cap = cv2.VideoCapture(ROOT_DIRECTORY + self.vid_file)
         frame_num = 0
         while (True):
             _, frame = cap.read()
             if frame is None:
                 break
-            cv2.imwrite(os.path.join(ROOT_DIRECTORY + '/' + self.ori_imgs_dir, str(frame_num) + '.jpg'), frame)
+            cv2.imwrite(os.path.join(ROOT_DIRECTORY + self.ori_imgs_dir, str(frame_num) + '.jpg'), frame)
             frame_num = frame_num + 1
         cap.release()
-        #exit()
 
     def step_2(self):
         print('--- Step 2: detect landmarks ---')
         fa = face_alignment.FaceAlignment(
             face_alignment.LandmarksType._2D, flip_input=False)
-        for image_path in os.listdir(ROOT_DIRECTORY + '/' + self.ori_imgs_dir):
+        for image_path in os.listdir(ROOT_DIRECTORY + self.ori_imgs_dir):
             if image_path.endswith('.jpg'):
-                input = io.imread(os.path.join(ROOT_DIRECTORY + '/' + self.ori_imgs_dir, image_path))[:, :, :3]
+                input = io.imread(os.path.join(ROOT_DIRECTORY + self.ori_imgs_dir, image_path))[:, :, :3]
                 preds = fa.get_landmarks(input)
                 if len(preds) > 0:
                     lands = preds[0].reshape(-1, 2)[:, :2]
-                    np.savetxt(os.path.join(ROOT_DIRECTORY + '/' + self.ori_imgs_dir, image_path[:-3] + 'lms'), lands, '%f')
-        self.height_weight()
+                    np.savetxt(os.path.join(ROOT_DIRECTORY + self.ori_imgs_dir, image_path[:-3] + 'lms'), lands, '%f')
 
     def step_6(self):
         print('--- Estimate Head Pose ---')
-        est_pose_cmd = f'python {ROOT_DIRECTORY}/AD-NeRF/data_util/face_tracking/face_tracker.py --idname=' + \
+        est_pose_cmd = f'python {ROOT_DIRECTORY}ad_nerf/data_util/face_tracking/face_tracker.py --idname=' + \
                        self.id + ' --img_h=' + str(self.h) + ' --img_w=' + str(self.w) + \
                        ' --frame_num=' + str(self.max_frame_num)
-        os.system(est_pose_cmd)
-        #exit()
+        exit_code = os.system(est_pose_cmd)
+        return exit_code
 
     def step_3(self):
         print('--- Step 3: face parsing ---')
-        face_parsing_cmd = f'python {ROOT_DIRECTORY}/AD-NeRF/data_util/face_parsing/test.py --respath={ROOT_DIRECTORY}/cloud/' + \
-                           self.id + f'/parsing --imgpath={ROOT_DIRECTORY}/cloud/' + self.id + '/ori_imgs'
+        face_parsing_cmd = f'python {ROOT_DIRECTORY}ad_nerf/data_util/face_parsing/test.py ' \
+                           f'--respath={ROOT_DIRECTORY}cloud/' + \
+                           self.id + f'/parsing --imgpath={ROOT_DIRECTORY}cloud/' + self.id + '/ori_imgs'
         os.system(face_parsing_cmd)
 
     def step_4(self):
@@ -137,7 +137,7 @@ class Preprocessing(object):
         all_xys = np.mgrid[0:self.h, 0:self.w].reshape(2, -1).transpose()
         distss = []
         for i in sel_ids:
-            parse_img = cv2.imread(os.path.join(ROOT_DIRECTORY + '/' + self.id_dir, 'parsing', str(i) + '.png'))
+            parse_img = cv2.imread(os.path.join(ROOT_DIRECTORY + self.id_dir, 'parsing', str(i) + '.png'))
             bg = (parse_img[..., 0] == 255) & (parse_img[..., 1] == 255) & (parse_img[..., 2] == 255)
             fg_xys = np.stack(np.nonzero(~bg)).transpose(1, 0)
             nbrs = NearestNeighbors(n_neighbors=1, algorithm='kd_tree').fit(fg_xys)
@@ -153,7 +153,7 @@ class Preprocessing(object):
         imgs = []
         num_pixs = distss.shape[1]
         for i in sel_ids:
-            img = cv2.imread(os.path.join(ROOT_DIRECTORY + '/' + self.ori_imgs_dir, str(i) + '.jpg'))
+            img = cv2.imread(os.path.join(ROOT_DIRECTORY + self.ori_imgs_dir, str(i) + '.jpg'))
             imgs.append(img)
         imgs = np.stack(imgs).reshape(-1, num_pixs, 3)
         bc_img = np.zeros((self.h * self.w, 3), dtype=np.uint8)
@@ -169,24 +169,24 @@ class Preprocessing(object):
         print(fg_xys.shape)
         print(np.max(bg_fg_xys), np.min(bg_fg_xys))
         bc_img[bg_xys[:, 0], bg_xys[:, 1], :] = bc_img[bg_fg_xys[:, 0], bg_fg_xys[:, 1], :]
-        cv2.imwrite(os.path.join(ROOT_DIRECTORY + '/' + self.id_dir, 'bc.jpg'), bc_img)
+        cv2.imwrite(os.path.join(ROOT_DIRECTORY + self.id_dir, 'bc.jpg'), bc_img)
 
     def step_5(self):
         print('--- Step 5: save training images ---')
-        bc_img = cv2.imread(os.path.join(ROOT_DIRECTORY + '/' + self.id_dir, 'bc.jpg'))
+        bc_img = cv2.imread(os.path.join(ROOT_DIRECTORY + self.id_dir, 'bc.jpg'))
         for i in self.valid_img_ids:
-            parsing_img = cv2.imread(os.path.join(ROOT_DIRECTORY + '/' + self.parsing_dir, str(i) + '.png'))
+            parsing_img = cv2.imread(os.path.join(ROOT_DIRECTORY + self.parsing_dir, str(i) + '.png'))
             head_part = (parsing_img[:, :, 0] == 255) & (parsing_img[:, :, 1] == 0) & (parsing_img[:, :, 2] == 0)
             bc_part = (parsing_img[:, :, 0] == 255) & (parsing_img[:, :, 1] == 255) & (parsing_img[:, :, 2] == 255)
-            img = cv2.imread(ROOT_DIRECTORY + '/' + os.path.join(self.ori_imgs_dir, str(i) + '.jpg'))
+            img = cv2.imread(ROOT_DIRECTORY + os.path.join(self.ori_imgs_dir, str(i) + '.jpg'))
             img[bc_part] = bc_img[bc_part]
-            cv2.imwrite(os.path.join(ROOT_DIRECTORY + '/' + self.com_imgs_dir, str(i) + '.jpg'), img)
+            cv2.imwrite(os.path.join(ROOT_DIRECTORY + self.com_imgs_dir, str(i) + '.jpg'), img)
             img[~head_part] = bc_img[~head_part]
-            cv2.imwrite(os.path.join(ROOT_DIRECTORY + '/' + self.head_imgs_dir, str(i) + '.jpg'), img)
+            cv2.imwrite(os.path.join(ROOT_DIRECTORY + self.head_imgs_dir, str(i) + '.jpg'), img)
 
     def step_7(self):
         print('--- Step 7: Save Transform Param ---')
-        params_dict = torch.load(os.path.join(ROOT_DIRECTORY + '/' + self.id_dir, 'track_params.pt'))
+        params_dict = torch.load(os.path.join(ROOT_DIRECTORY + self.id_dir, 'track_params.pt'))
         focal_len = params_dict['focal']
         euler_angle = params_dict['euler']
         trans = params_dict['trans'] / 10.0
@@ -273,16 +273,66 @@ class Preprocessing(object):
 
         print(self.id + ' data processed done!')
 
-if __name__ == "__main__":
-    preproc = Preprocessing(id='premier')
-    # preproc.step_0()
-    # preproc.step_1()
-    # preproc.step_2()
-    preproc.height_weight()
-    # preproc.step_6()
-    # preproc.step_3()
-    # preproc.step_4()
-    # preproc.step_5()
-    preproc.step_7()
-    # print(Path(__file__).absolute().parent.parent)
 
+def step_one(preproc):
+    preproc.step_0()
+    preproc.step_1()
+    preproc.step_2()
+    # del preproc
+    torch.cuda.empty_cache()
+
+
+def step_two(preproc):
+    preproc.height_weight()
+    preproc.step_6()
+    # del preproc
+    torch.cuda.empty_cache()
+
+
+def step_three(preproc):
+    preproc.step_3()
+    preproc.height_weight()
+    preproc.step_4()
+    preproc.step_5()
+    preproc.step_7()
+    # del preproc
+    torch.cuda.empty_cache()
+
+
+def preprocessing_processes(video_id: str):
+    # Запуск предобработки видео по его id
+    preproc = Preprocessing(id=video_id)
+
+    proc_1 = mp.Process(target=step_one,
+                        args=(preproc,),
+                        daemon=True,
+                        name='proc_1')
+    proc_2 = mp.Process(target=step_two,
+                        args=(preproc,),
+                        daemon=True,
+                        name='proc_2')
+    proc_3 = mp.Process(target=step_three,
+                        args=(preproc,),
+                        daemon=True,
+                        name='proc_3')
+
+    proc_1.start()
+    proc_1.join()
+    proc_1.kill()
+
+    proc_2.start()
+    proc_2.join()
+    proc_2.kill()
+
+    proc_3.start()
+    proc_3.join()
+    proc_3.kill()
+
+
+if __name__ == "__main__":
+    # Запуск предобработки видео если вызвать только этот файл
+    mp.set_start_method(method='spawn', force=True)
+    torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
+    video_id = 'Obama1'
+    preprocessing_processes(video_id)
