@@ -86,7 +86,7 @@ class Preprocessing(object):
         extract_wav_cmd = 'ffmpeg -i ' + ROOT_DIRECTORY + self.vid_file + ' -f wav -ar 16000 ' + \
                           ROOT_DIRECTORY + wav_file
         os.system(extract_wav_cmd)
-        print(self.id_dir)
+        # print(self.id_dir)
         extract_ds_cmd = f'python {ROOT_DIRECTORY}ad_nerf/data_util/deepspeech_features/extract_ds_features.py ' \
                          f'--input=' + ROOT_DIRECTORY + self.id_dir
         os.system(extract_ds_cmd)

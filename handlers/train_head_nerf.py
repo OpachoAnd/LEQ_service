@@ -532,7 +532,7 @@ def config_parser():
                         help='do not reload weights from saved ckpt')
     parser.add_argument("--ft_path", type=str, default=None,
                         help='specific weights npy file to reload for coarse network')
-    parser.add_argument("--N_iters", type=int, default=400000,
+    parser.add_argument("--N_iters", type=int, default=10,
                         help='number of iterations')
 
     # rendering options
@@ -725,25 +725,6 @@ def train_head(path_config_head):
     bc_img = torch.Tensor(bc_img).to(device).float()/255.0
     poses = torch.Tensor(poses).to(device).float()
     auds = torch.Tensor(auds).to(device).float()
-
-    if args.render_only:
-        print('RENDER ONLY')
-        with torch.no_grad():
-            # Default is smoother render_poses path
-            images = None
-            testsavedir = os.path.join(basedir, expname, 'renderonly_{}_{:06d}'.format(
-                'test' if args.render_test else 'path', start))
-            os.makedirs(testsavedir, exist_ok=True)
-            print('test poses shape', poses.shape)
-            auds_val = AudNet(auds)
-            rgbs, disp, last_weight = render_path(poses, auds_val, bc_img, hwfcxy, args.chunk, render_kwargs_test,
-                                                  gt_imgs=images, savedir=testsavedir, render_factor=args.render_factor)
-            np.save(os.path.join(testsavedir, 'last_weight.npy'), last_weight)
-            print('Done rendering', testsavedir)
-            imageio.mimwrite(os.path.join(
-                testsavedir, 'video.mp4'), to8b(rgbs), fps=30, quality=8)
-            return
-
     num_frames = images.shape[0]
 
 
@@ -964,9 +945,3 @@ def train_head(path_config_head):
             tqdm.write(
                 f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
         global_step += 1
-
-
-# if __name__ == '__main__':
-#     torch.set_default_tensor_type('torch.cuda.FloatTensor')
-
-    # train()
