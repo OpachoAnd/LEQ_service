@@ -46,33 +46,6 @@ def pose_to_euler_trans(poses):
     return torch.cat((e, t), dim=1)
 
 
-def euler2rot(euler_angle):
-    batch_size = euler_angle.shape[0]
-    theta = euler_angle[:, 0].reshape(-1, 1, 1)
-    phi = euler_angle[:, 1].reshape(-1, 1, 1)
-    psi = euler_angle[:, 2].reshape(-1, 1, 1)
-    one = torch.ones((batch_size, 1, 1), dtype=torch.float32,
-                     device=euler_angle.device)
-    zero = torch.zeros((batch_size, 1, 1), dtype=torch.float32,
-                       device=euler_angle.device)
-    rot_x = torch.cat((
-        torch.cat((one, zero, zero), 1),
-        torch.cat((zero, theta.cos(), theta.sin()), 1),
-        torch.cat((zero, -theta.sin(), theta.cos()), 1),
-    ), 2)
-    rot_y = torch.cat((
-        torch.cat((phi.cos(), zero, -phi.sin()), 1),
-        torch.cat((zero, one, zero), 1),
-        torch.cat((phi.sin(), zero, phi.cos()), 1),
-    ), 2)
-    rot_z = torch.cat((
-        torch.cat((psi.cos(), -psi.sin(), zero), 1),
-        torch.cat((psi.sin(), psi.cos(), zero), 1),
-        torch.cat((zero, zero, one), 1)
-    ), 2)
-    return torch.bmm(rot_x, torch.bmm(rot_y, rot_z))
-
-
 def batchify(fn, chunk):
     """Constructs a version of 'fn' that applies to smaller batches.
     """
@@ -575,40 +548,12 @@ def config_parser():
     parser.add_argument("--datadir", type=str, default='./data/llff/fern',
                         help='input data directory')
 
-    # training options
-    parser.add_argument("--netdepth", type=int, default=8,
-                        help='layers in network')
-    parser.add_argument("--netwidth", type=int, default=256,
-                        help='channels per layer')
-    parser.add_argument("--netdepth_fine", type=int, default=8,
-                        help='layers in fine network')
-    parser.add_argument("--netwidth_fine", type=int, default=256,
-                        help='channels per layer in fine network')
-    parser.add_argument("--N_rand", type=int, default=256,  # 512,  # 1024,
-                        help='batch size (number of random rays per gradient step)')
-    parser.add_argument("--lrate", type=float, default=5e-4,
-                        help='learning rate')
-    parser.add_argument("--lrate_decay", type=int, default=250,
-                        help='exponential learning rate decay (in 1000 steps)')
-    parser.add_argument("--chunk", type=int, default=265,  # 1024,
-                        help='number of rays processed in parallel, decrease if running out of memory')
-    parser.add_argument("--netchunk", type=int, default=1024,  # *64,
-                        help='number of pts sent through network in parallel, decrease if running out of memory')
-    parser.add_argument("--no_batching", action='store_false',
-                        help='only take random rays from 1 image at a time')
-    parser.add_argument("--no_reload", action='store_true',
-                        help='do not reload weights from saved ckpt')
-    parser.add_argument("--ft_path", type=str, default=None,
-                        help='specific weights npy file to reload for coarse network')
-    parser.add_argument("--N_iters", type=int, default=10,
-                        help='number of iterations')
-
     # rendering options
     parser.add_argument("--N_samples", type=int, default=64,
                         help='number of coarse samples per ray')
     parser.add_argument("--N_importance", type=int, default=128,
                         help='number of additional fine samples per ray')
-    parser.add_argument("--perturb", type=float, default=1.,
+    parser.add_argument("--perturb", type=float, default=0.,
                         help='set to 0. for no jitter, 1. for jitter')
     parser.add_argument("--use_viewdirs", action='store_false',
                         help='use full 5D input instead of 3D')
@@ -628,12 +573,6 @@ def config_parser():
     parser.add_argument("--render_factor", type=int, default=0,
                         help='downsampling factor to speed up rendering, set 4 or 8 for fast preview')
 
-    # training options
-    parser.add_argument("--precrop_iters", type=int, default=0,
-                        help='number of steps to train on central crops')
-    parser.add_argument("--precrop_frac", type=float,
-                        default=.5, help='fraction of img taken for central crops')
-
     # dataset options
     parser.add_argument("--dataset_type", type=str, default='audface',
                         help='options: llff / blender / deepvoxels')
@@ -651,7 +590,7 @@ def config_parser():
                         help='load blender synthetic data at 400x400 instead of 800x800')
 
     # face flags
-    parser.add_argument("--with_test", type=int, default=0,
+    parser.add_argument("--with_test", type=int, default=1,
                         help='whether to test')
     parser.add_argument("--dim_aud", type=int, default=64,
                         help='dimension of audio features for NeRF')
@@ -702,15 +641,43 @@ def config_parser():
     parser.add_argument("--i_video",   type=int, default=50000,
                         help='frequency of render_poses video saving')
 
+    # training options
+    parser.add_argument("--netdepth", type=int, default=8,
+                        help='layers in network')
+    parser.add_argument("--netwidth", type=int, default=256,
+                        help='channels per layer')
+    parser.add_argument("--netdepth_fine", type=int, default=8,
+                        help='layers in fine network')
+    parser.add_argument("--netwidth_fine", type=int, default=256,
+                        help='channels per layer in fine network')
+    parser.add_argument("--N_rand", type=int, default=1024,
+                        help='batch size (number of random rays per gradient step)')
+    parser.add_argument("--lrate", type=float, default=5e-4,
+                        help='learning rate')
+    parser.add_argument("--lrate_decay", type=int, default=250,
+                        help='exponential learning rate decay (in 1000 steps)')
+    parser.add_argument("--chunk", type=int, default=1024,
+                        help='number of rays processed in parallel, decrease if running out of memory')
+    parser.add_argument("--netchunk", type=int, default=1024 * 64,
+                        help='number of pts sent through network in parallel, decrease if running out of memory')
+    parser.add_argument("--no_batching", action='store_false',
+                        help='only take random rays from 1 image at a time')
+    parser.add_argument("--no_reload", action='store_true',
+                        help='do not reload weights from saved ckpt')
+    parser.add_argument("--ft_path", type=str, default=None,
+                        help='specific weights npy file to reload for coarse network')
+    parser.add_argument("--N_iters", type=int, default=400000,
+                        help='number of iterations')
+
     return parser
 
 
-def train_torso(path_config_torso):
+def inference(path_config_inference, path_audio):
     parser = config_parser()
     args = parser.parse_args()
 
     d = {}
-    with open(path_config_torso) as f:
+    with open(path_config_inference) as f:
         for line in f:
             (key, val) = line.split(' = ')
             d[str(key)] = val[:-1]
@@ -720,7 +687,9 @@ def train_torso(path_config_torso):
     args.basedir = d['basedir']
     args.near = float(d['near'])
     args.far = float(d['far'])
-    args.testskip = int(d['testskip'])
+    args.with_test = int(d['with_test'])
+    args.test_pose_file = str(d['test_pose_file'])
+    args.aud_file = path_audio
 
     # Load data
     if args.with_test == 1:
@@ -728,13 +697,6 @@ def train_torso(path_config_torso):
             load_test_data(args.datadir, args.aud_file,
                            args.test_pose_file, args.testskip, args.test_size, args.aud_start)
         torso_pose = torch.as_tensor(torso_pose).to(device_torso).float()
-        com_images = np.zeros(1)
-    else:
-        com_images, poses, auds, bc_img, hwfcxy, sample_rects, \
-            i_split = load_audface_data(args.datadir, args.testskip)
-
-    if args.with_test == 0:
-        i_train, i_val = i_split
 
     near = args.near
     far = args.far
@@ -742,7 +704,7 @@ def train_torso(path_config_torso):
     # Cast intrinsics to right types
     H, W, focal, cx, cy = hwfcxy
     H, W = int(H), int(W)
-    hwf = [H, W, focal]
+
     hwfcxy = [H, W, focal, cx, cy]
 
     # Create log dir and copy the config file
@@ -755,17 +717,16 @@ def train_torso(path_config_torso):
             attr = getattr(args, arg)
             file.write('{} = {}\n'.format(arg, attr))
     # if args.config is not None:
-    if path_config_torso is not None:
+    if path_config_inference is not None:
         f = os.path.join(basedir, expname, 'config.txt')
         with open(f, 'w') as file:
-            file.write(open(path_config_torso, 'r').read())
+            file.write(open(path_config_inference, 'r').read())
             # file.write(open(args.config, 'r').read())
 
     # Create nerf model
     render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer, \
         learned_codes, AudNet_state, optimizer_aud_state, AudAttNet_state = create_nerf(
             args, 'head.tar', args.dim_aud, device, True)
-    global_step = start
 
     AudNet = AudioNet(args.dim_aud, args.win_size).to(device)
     AudAttNet = AudioAttNet().to(device)
@@ -791,7 +752,6 @@ def train_torso(path_config_torso):
     poses = torch.Tensor(poses).to(device).float()
     auds = torch.Tensor(auds).to(device).float()
 
-    num_frames = com_images.shape[0]
 
     embed_fn, input_ch = get_embedder(3, 0)
     dim_torso_signal = args.dim_aud_body + 2*input_ch
@@ -799,7 +759,6 @@ def train_torso(path_config_torso):
     render_kwargs_train_torso, render_kwargs_test_torso, start, grad_vars_torso, optimizer_torso, \
         learned_codes_torso, AudNet_state_torso, optimizer_aud_state_torso, _ = create_nerf(
             args, 'body.tar', dim_torso_signal, device_torso)
-    global_step = start
 
     AudNet_torso = AudioNet(args.dim_aud_body, args.win_size).to(device_torso)
     optimizer_Aud_torso = torch.optim.Adam(
@@ -816,275 +775,61 @@ def train_torso(path_config_torso):
     render_kwargs_train_torso.update(bds_dict)
     render_kwargs_test_torso.update(bds_dict)
 
-    N_rand = args.N_rand
-    use_batching = not args.no_batching
-    if use_batching:
-        # For random ray batching
-        print('get rays')
-        rays = np.stack([get_rays_np(H, W, focal, p, cx, cy)
-                         for p in poses[:, :3, :4]], 0)  # [N, ro+rd, H, W, 3]
-        print('done, concats')
-        # [N, ro+rd+rgb, H, W, 3]
-        rays_rgb = np.concatenate([rays, com_images[:, None]], 1)
-        # [N, H, W, ro+rd+rgb, 3]
-        rays_rgb = np.transpose(rays_rgb, [0, 2, 3, 1, 4])
-        rays_rgb = np.stack([rays_rgb[i]
-                             for i in i_train], 0)  # train images only
-        # [(N-1)*H*W, ro+rd+rgb, 3]
-        rays_rgb = np.reshape(rays_rgb, [-1, 3, 3])
-        rays_rgb = rays_rgb.astype(np.float32)
-        print('shuffle rays')
-        np.random.shuffle(rays_rgb)
-
-        print('done')
-        i_batch = 0
-
-    if use_batching:
-        rays_rgb = torch.Tensor(rays_rgb).to(device)
-
-    N_iters = args.N_iters + 1
-    print('Begin')
-    print('TRAIN views are', i_train)
-    print('VAL views are', i_val)
-
-    start = start + 1
-    for i in trange(start, N_iters):
-        time0 = time.time()
-
-        # Sample random ray batch
-        if use_batching:
-            # Random over all images
-            batch = rays_rgb[i_batch:i_batch+N_rand]  # [B, 2+1, 3*?]
-            batch = torch.transpose(batch, 0, 1)
-            batch_rays, target_s = batch[:2], batch[2]
-
-            i_batch += N_rand
-            if i_batch >= rays_rgb.shape[0]:
-                print("Shuffle data after an epoch!")
-                rand_idx = torch.randperm(rays_rgb.shape[0])
-                rays_rgb = rays_rgb[rand_idx]
-                i_batch = 0
-
-        else:
-            # Random from one image
-            img_i = np.random.choice(i_train)
-            target_com = torch.as_tensor(imageio.imread(
-                com_images[img_i])).to(device).float()/255.0
-            pose = poses[img_i, :3, :4]
-            pose_torso = poses[0, :3, :4].to(device_torso)
-            rect = sample_rects[img_i]
-            aud = auds[img_i]
-
-            smo_half_win = int(args.smo_size/2)
-            left_i = img_i - smo_half_win
-            right_i = img_i + smo_half_win
-            pad_left, pad_right = 0, 0
-            if left_i < 0:
-                pad_left = -left_i
-                left_i = 0
-            if right_i > i_train.shape[0]:
-                pad_right = right_i-i_train.shape[0]
-                right_i = i_train.shape[0]
-            auds_win = auds[left_i:right_i]
-            if pad_left > 0:
-                auds_win = torch.cat(
-                    (torch.zeros_like(auds_win)[:pad_left], auds_win), dim=0)
-            if pad_right > 0:
-                auds_win = torch.cat(
-                    (auds_win, torch.zeros_like(auds_win)[:pad_right]), dim=0)
-            auds_win = AudNet(auds_win)
-            aud_smo = AudAttNet(auds_win)
-            aud_smo_torso = aud_smo.to(device_torso)[..., :args.dim_aud_body]
-
-            et = pose_to_euler_trans(poses[img_i].unsqueeze(0))
-            embed_et = torch.cat(
-                (embed_fn(et[:, :3]), embed_fn(et[:, 3:])), dim=1).to(device_torso)
-            signal = torch.cat((aud_smo_torso, embed_et.squeeze()), dim=-1)
-            if N_rand is not None:
-                rays_o, rays_d = get_rays(
-                    H, W, focal, pose, cx, cy, device)  # (H, W, 3), (H, W, 3)
-                rays_o_torso, rays_d_torso = get_rays(
-                    H, W, focal, pose_torso, cx, cy, device_torso)
-
-                if i < args.precrop_iters:
-                    dH = int(H//2 * args.precrop_frac)
-                    dW = int(W//2 * args.precrop_frac)
-                    coords = torch.stack(
-                        torch.meshgrid(
-                            torch.linspace(H//2 - dH, H//2 + dH - 1, 2*dH),
-                            torch.linspace(W//2 - dW, W//2 + dW - 1, 2*dW)
-                        ), -1)
-                    if i == start:
-                        print(
-                            f"[Config] Center cropping of size {2*dH} x {2*dW} is enabled until iter {args.precrop_iters}")
-                else:
-                    coords = torch.stack(torch.meshgrid(torch.linspace(
-                        0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
-
-                coords = torch.reshape(coords, [-1, 2])  # (H * W, 2)
-                if args.sample_rate > 0:
-                    rect = [0, H/2, W, H/2]
-                    rect_inds = (coords[:, 0] >= rect[0]) & (
-                        coords[:, 0] <= rect[0] + rect[2]) & (
-                            coords[:, 1] >= rect[1]) & (
-                                coords[:, 1] <= rect[1] + rect[3])
-                    coords_rect = coords[rect_inds]
-                    coords_norect = coords[~rect_inds]
-                    rect_num = int(N_rand*float(rect[2])*rect[3]/H/W)
-                    norect_num = N_rand - rect_num
-                    select_inds_rect = np.random.choice(
-                        coords_rect.shape[0], size=[rect_num], replace=False)  # (N_rand,)
-                    # (N_rand, 2)
-                    select_coords_rect = coords_rect[select_inds_rect].long()
-                    select_inds_norect = np.random.choice(
-                        coords_norect.shape[0], size=[norect_num], replace=False)  # (N_rand,)
-                    # (N_rand, 2)
-                    select_coords_norect = coords_norect[select_inds_norect].long(
-                    )
-                    select_coords = torch.cat(
-                        (select_coords_norect, select_coords_rect), dim=0)
-
-                else:
-                    select_inds = np.random.choice(
-                        coords.shape[0], size=[N_rand], replace=False)  # (N_rand,)
-                    select_coords = coords[select_inds].long()
-                    norect_num = 0
-
-                rays_o = rays_o[select_coords[:, 0],
-                                select_coords[:, 1]]  # (N_rand, 3)
-                rays_d = rays_d[select_coords[:, 0],
-                                select_coords[:, 1]]  # (N_rand, 3)
-                batch_rays = torch.stack([rays_o, rays_d], 0)
-                bc_rgb = bc_img[select_coords[:, 0],
-                                select_coords[:, 1]]
-
-                rays_o_torso = rays_o_torso[select_coords[:, 0],
-                                            select_coords[:, 1]]  # (N_rand, 3)
-                rays_d_torso = rays_d_torso[select_coords[:, 0],
-                                            select_coords[:, 1]]  # (N_rand, 3)
-                batch_rays_torso = torch.stack([rays_o_torso, rays_d_torso], 0)
-                bc_rgb = bc_img[select_coords[:, 0],
-                                select_coords[:, 1]]
-                bc_rgb_torso = bc_rgb.to(device_torso)
-
-                target_s_com = target_com[select_coords[:, 0],
-                                          select_coords[:, 1]]  # (N_rand, 3)
-
-        #####  Core optimization loop  #####
-        rgb, disp, acc, last_weight, rgb_fg, extras = \
-            render_dynamic_face(H, W, focal, cx, cy, chunk=args.chunk, rays=batch_rays,
-                                aud_para=aud_smo, bc_rgb=bc_rgb,
-                                verbose=i < 10, retraw=True,
-                                ** render_kwargs_train)
-        rgb_torso, disp_torso, acc_torso, last_weight_torso, rgb_fg_torso, extras_torso = \
-            render_dynamic_face(H, W, focal, cx, cy, chunk=args.chunk, rays=batch_rays_torso,
-                                aud_para=signal, bc_rgb=bc_rgb_torso,
-                                verbose=i < 10, retraw=True,
-                                **render_kwargs_train_torso)
-        rgb_com = rgb * \
-            last_weight_torso.to(device)[..., None] + rgb_fg_torso.to(device)
-
-        optimizer_torso.zero_grad()
-        img_loss_com = img2mse(rgb_com, target_s_com)
-        trans = extras['raw'][..., -1]
-        split_weight = float(1.0)
-        loss = img_loss_com
-        psnr = mse2psnr(img_loss_com)
-
-        if 'rgb0' in extras_torso:
-            rgb_com0 = extras['rgb0'] * \
-                extras_torso['last_weight0'].to(
-                    device)[..., None] + extras_torso['rgb_map_fg0'].to(device)
-            img_loss0 = img2mse(rgb_com0, target_s_com)
-            loss = loss + img_loss0
-
-        loss.backward()
-        optimizer_torso.step()
-
-        # NOTE: IMPORTANT!
-        ###   update learning rate   ###
-        decay_rate = 0.1
-        decay_steps = args.lrate_decay * 1000
-        new_lrate = args.lrate * (decay_rate ** (global_step / decay_steps))
-        #print('cur_rate', new_lrate)
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = new_lrate
-
-        for param_group in optimizer_Aud.param_groups:
-            param_group['lr'] = new_lrate
-
-        for param_group in optimizer_torso.param_groups:
-            param_group['lr'] = new_lrate
-
-        for param_group in optimizer_Aud_torso.param_groups:
-            param_group['lr'] = new_lrate
-        ################################
-
-        dt = time.time()-time0
-
-        # Rest is logging
-        if i % args.i_weights == 0:
-            path = os.path.join(basedir, expname, '{:06d}_head.tar'.format(i))
-            torch.save({
-                'global_step': global_step,
-                'network_fn_state_dict': render_kwargs_train['network_fn'].state_dict(),
-                'network_fine_state_dict': render_kwargs_train['network_fine'].state_dict(),
-                'network_audnet_state_dict': AudNet.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'optimizer_aud_state_dict': optimizer_Aud.state_dict(),
-                'network_audattnet_state_dict': AudAttNet.state_dict(),
-            }, path)
-
-            path = os.path.join(basedir, expname, '{:06d}_body.tar'.format(i))
-            torch.save({
-                'global_step': global_step,
-                'network_fn_state_dict': render_kwargs_train_torso['network_fn'].state_dict(),
-                'network_fine_state_dict': render_kwargs_train_torso['network_fine'].state_dict(),
-                'network_audnet_state_dict': AudNet_torso.state_dict(),
-                'optimizer_state_dict': optimizer_torso.state_dict(),
-                'optimizer_aud_state_dict': optimizer_Aud_torso.state_dict(),
-            }, path)
-            print('Saved checkpoints at', path)
-
-        if i % args.i_testset == 0 and i > 0:
-            testsavedir = os.path.join(
-                basedir, expname, 'testset_{:06d}'.format(i))
+    if args.with_test:
+        print('RENDER ONLY')
+        with torch.no_grad():
+            testsavedir = os.path.join(basedir, expname, args.test_save_folder)
             os.makedirs(testsavedir, exist_ok=True)
-            print('test poses shape', poses[i_val].shape)
+            print('test poses shape', poses.shape)
+            smo_half_win = int(args.smo_size / 2)
+            auds_val = []
+            for i in range(poses.shape[0]):
+                left_i = i - smo_half_win
+                right_i = i + smo_half_win
+                pad_left, pad_right = 0, 0
+                if left_i < 0:
+                    pad_left = -left_i
+                    left_i = 0
+                if right_i > poses.shape[0]:
+                    pad_right = right_i - poses.shape[0]
+                    right_i = poses.shape[0]
+                auds_win = auds[left_i:right_i]
+                if pad_left > 0:
+                    auds_win = torch.cat(
+                        (torch.zeros_like(auds_win)[:pad_left], auds_win), dim=0)
+                if pad_right > 0:
+                    auds_win = torch.cat(
+                        (auds_win, torch.zeros_like(auds_win)[:pad_right]), dim=0)
+                auds_win = AudNet(auds_win)
+                aud_smo = AudAttNet(auds_win)
+                auds_val.append(aud_smo)
+            auds_val = torch.stack(auds_val, 0)
 
-            aud_torso = AudNet(
-                auds[i_val])[..., :args.dim_aud_body].to(device_torso)
-            et = pose_to_euler_trans(poses[i_val])
+            adjust_poses = poses.clone()
+            adjust_poses_torso = poses.clone()
+
+            et = pose_to_euler_trans(adjust_poses_torso)
             embed_et = torch.cat(
-                (embed_fn(et[:, :3]), embed_fn(et[:, 3:])), dim=1).to(device_torso)
-            signal = torch.cat((aud_torso, embed_et.squeeze()), dim=-1)
-
-            auds_val = AudNet(auds[i_val])
-            with torch.no_grad():
-                for j in range(auds_val.shape[0]):
-                    rgbs, disps, last_weights, rgb_fgs = \
-                        render_path(poses[i_val][j:j+1], auds_val[j:j+1],
-                                    bc_img, hwfcxy, args.chunk, render_kwargs_test)
-                    rgbs_torso, disps_torso, last_weights_torso, rgb_fgs_torso = \
-                        render_path(poses[0].to(device_torso).unsqueeze(0),
-                                    signal[j:j+1], bc_img.to(
-                                        device_torso), hwfcxy, args.chunk, render_kwargs_test_torso)
-                    rgbs_com = rgbs * \
-                        last_weights_torso[..., None] + rgb_fgs_torso
-                    rgb8 = to8b(rgbs_com[0])
-                    filename = os.path.join(
-                        testsavedir, '{:03d}.jpg'.format(j))
-                    imageio.imwrite(filename, rgb8)
-            print('Saved test set')
-
-        if i % args.i_print == 0:
-            tqdm.write(
-                f"[TRAIN] Iter: {i} Loss: {img_loss_com.item()}  PSNR: {psnr.item()}")
-
-        global_step += 1
-
-
-if __name__ == '__main__':
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
-
-    # train()
+                (embed_fn(et[:, :3]), embed_fn(et[:, 3:])), dim=-1).to(device_torso)
+            signal = torch.cat((auds_val[..., :args.dim_aud_body].to(
+                device_torso), embed_et.squeeze()), dim=-1)
+            t_start = time.time()
+            vid_out = cv2.VideoWriter(os.path.join(testsavedir, 'result.avi'),
+                                      cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 25, (W, H))
+            for j in range(poses.shape[0]):
+                rgbs, disps, last_weights, rgb_fgs = \
+                    render_path(adjust_poses[j:j+1], auds_val[j:j+1],
+                                bc_img, hwfcxy, args.chunk, render_kwargs_test)
+                rgbs_torso, disps_torso, last_weights_torso, rgb_fgs_torso = \
+                    render_path(torso_pose.unsqueeze(
+                        0), signal[j:j+1], bc_img.to(device_torso), hwfcxy, args.chunk, render_kwargs_test_torso)
+                rgbs_com = rgbs*last_weights_torso[..., None] + rgb_fgs_torso
+                rgb8 = to8b(rgbs_com[0])
+                vid_out.write(rgb8[:, :, ::-1])
+                filename = os.path.join(
+                    testsavedir, str(aud_ids[j]) + '.jpg')
+                imageio.imwrite(filename, rgb8)
+                print('finished render', j)
+            print('finished render in', time.time()-t_start)
+            vid_out.release()
+            return
