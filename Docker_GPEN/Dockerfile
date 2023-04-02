@@ -1,6 +1,12 @@
-FROM python:3.9
+FROM nvidia/cuda:11.3.0-devel-ubuntu20.04
+
+ENV DEBIAN_FRONTEND noninteractive
 
 WORKDIR /usr/src/app
+
+RUN apt-get update && apt-get install -y git
+RUN apt-get install -y python3.9
+RUN apt-get install -y python3-pip
 
 # В этой ветке буду все клонировать из репозитория (не используя сабмодуль)
 RUN git clone https://github.com/LevchenkoJH/GPEN
