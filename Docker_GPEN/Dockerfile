@@ -21,3 +21,4 @@ RUN pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1
 
 #python GPEN/demo.py --model L-GPEN-256-256-300000 --in_size 256 --out_size 256 --indir indir --outdir outdir
 # Добавить ссылку на папку с видео
+# Загрузить веса на гугл-диск
