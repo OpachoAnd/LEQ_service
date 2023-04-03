@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+    ad_nerf:
+        container_name: ad_nerf
+        image: opachoand/adnerf
+        restart: always
+        build: 
+            context: .
+            dockerfile: Dockerfile
+        ports:
+            - 5432:5432
+    mq:
+        container_name: rabbit_mq
+        image: rabbitmq
+        restart: always
+        ports:
+            - 5672:5672
+            - 15672:15672
+        environment:
+            RABBITMQ_DEFAULT_USER: guest
+            RABBITMQ_DEFAULT_PASS: guest
