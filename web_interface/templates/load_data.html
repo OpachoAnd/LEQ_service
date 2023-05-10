@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>LEQ_service</title>
+    </head>
+    <body>
+        <form enctype="multipart/form-data" method="post">
+            <p>Загрузите исходное видео на сервер</p>
+            <p><input type="file" name="video"></p>
+
+            <p>Загрузите целевой звук на сервер</p>
+            <p><input type="file" name="audio"></p>
+
+            <p><select name="emotion">
+                <option disabled>Выберите эмоцию для наложения</option>
+                <option value="happy">Радость</option>
+                <option value="angry">Злость</option>
+                <option value="sad">Грусть</option>
+                <option value="fear">Страх</option>
+                <option value="disgusted">Отвращение</option>
+                <option value="surprised">Удивление</option>
+                <option value="neutral">Без эмоций</option>
+            </select></p>
+
+            <p>Введите свой e-mail для отправки готового видео</p>
+            <p><input type="text" name="email"></p>
+            <p><input type="submit" value="Отправить"></p>
+        </form>
+    </body>
+</html>
