@@ -1,10 +1,20 @@
 version: '3'
 
 services:
+    web_interface:
+        container_name: web
+        image: opachoand/web
+        restart: always
+        volumes:
+            - /home/opacho/Документы/GitHub/LEQ_service/cloud:/usr/src/app/cloud
+        ports:
+            - 8000:8000
     ad_nerf:
         container_name: ad_nerf
         image: opachoand/adnerf
         restart: always
+        volumes:
+            - /home/opacho/Документы/GitHub/LEQ_service/cloud:/usr/src/app/cloud
         build: 
             context: .
             dockerfile: Dockerfile
