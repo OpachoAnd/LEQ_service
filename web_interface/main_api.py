@@ -66,7 +66,6 @@ def main_page():
                 channel = connection.channel()
                 channel.queue_declare(queue='ad_nerf')
                 channel.basic_publish(exchange='', routing_key='ad_nerf', body=data)
-
                 print('ok_connection', flush=True)
             except:
                 print('error_connection', flush=True)

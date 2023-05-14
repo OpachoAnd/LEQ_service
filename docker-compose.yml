@@ -1,18 +1,10 @@
 version: '3'
 
 services:
-    web_interface:
-        container_name: web
-        image: opachoand/web
-        restart: always
-        volumes:
-            - /home/opacho/Документы/GitHub/LEQ_service/cloud:/usr/src/app/cloud
-        ports:
-            - 8000:8000
     ad_nerf:
         container_name: ad_nerf
         image: opachoand/adnerf
-        restart: always
+        restart: 'no'
         volumes:
             - /home/opacho/Документы/GitHub/LEQ_service/cloud:/usr/src/app/cloud
         build: 
@@ -20,6 +12,15 @@ services:
             dockerfile: Dockerfile
         ports:
             - 5432:5432
+    web_interface:
+        container_name: web
+        image: opachoand/web
+        restart: always
+        build: web_interface/
+        volumes:
+            - /home/opacho/Документы/GitHub/LEQ_service/cloud:/usr/src/app/cloud
+        ports:
+            - 8000:8000
     mq:
         container_name: rabbit_mq
         image: rabbitmq
