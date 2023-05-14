@@ -28,6 +28,7 @@ WORKDIR /usr/src/app
 COPY . /usr/src/app
 ENV PYTHONPATH /usr/src/app
 ENV CUDA_HOME "${CUDA_HOME}/usr/local/cuda-11.2"
+EXPOSE 5672
 
 # install environment for ad_nerf
 RUN /conda/bin/conda env create -f environment.yml 
@@ -41,5 +42,6 @@ RUN /conda/bin/activate adnerf2 && cd ad_nerf/data_util/face_tracking && /conda/
 #CMD /conda/envs/adnerf2/bin/pip install -e pytorch3d/.; /conda/envs/adnerf2/bin/python handlers/preprocessing_video.py
 
 ENTRYPOINT ["/bin/bash", "-c", "/conda/bin/conda run --no-capture-output -n adnerf2 pip install -e pytorch3d/. && /conda/bin/conda run --no-capture-output -n adnerf2 python main.py"]
+#ENTRYPOINT ["/bin/bash", "-c", "/conda/bin/conda run --no-capture-output -n adnerf2 python main_api.py"]
 #CMD ["/conda/envs/adnerf2/bin/python", "handlers/preprocessing_video.py"]
 
